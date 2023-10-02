@@ -1,0 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+body {
+  font-family: "Roboto";
+  margin: 20px;
+}
+h1 {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid rgba(29, 111, 66, 0.15);
+  font-size: 1.5rem;
+  font-weight: 400;
+}
+.dropzone {
+  flex: 1;
+  border: 0.2rem dashed rgba(29, 111, 66, 1);
+  padding: 2rem;
+  border-radius: 0.25rem;
+  background-color: #fff;
+  text-align: center;
+  font-size: 1.5rem;
+  transition: 0.25s background-color ease-in-out;
+  cursor: pointer;
+}
+
+.dropzone-dragging, .dropzone:hover {
+  background-color: rgba(29, 111, 66, 0.28);
+}
+
+.dropzone-icon {
+  max-width: 75px;
+  display: block;
+  margin: 0 auto 1.5rem;
+}
+
+.dropzone-input {
+  display: none;
+}
