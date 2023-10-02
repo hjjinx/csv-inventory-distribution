@@ -1,5 +1,8 @@
 var dropzone = document.getElementById('dropzone');
-var dropzone_input = document.getElementById('dropzone-input');
+var dropzoneIcon = document.getElementById('dropzone-icon');
+var dropzoneInput = document.getElementById('dropzone-input');
+var dropzoneText = document.getElementById('dropzone-text');
+var loader = document.getElementById('loader');
 
 ['drag', 'dragstart', 'dragend', 'dragover', 'dragenter', 'dragleave', 'drop'].forEach(function(event) {
   dropzone.addEventListener(event, function(e) {
@@ -19,18 +22,27 @@ dropzone.addEventListener('dragleave', function(e) {
 dropzone.addEventListener('drop', function(e) {
   this.classList.remove('dropzone-dragging');
   var file = e.dataTransfer.files[0];
+  fileUploaded(file)
+}, false);
+
+dropzoneInput.addEventListener('change', (e) => {
+  fileUploaded(e.target.files[0])
+})
+
+dropzone.addEventListener('click', function(e) {
+  dropzoneInput.click();
+});
+
+const fileUploaded = (file) => {
   if (file.type === 'text/csv') {
-    readFile(file)
+    loader.style.display = 'flex'
+    dropzoneText.innerHTML = 'Reading CSV...'
+    dropzoneIcon.style.display = 'none'
+    setTimeout(() => readFile(file), 500)
   } else {
     alert('Please upload a valid CSV file!')
   }
-
-  
-}, false);
-
-dropzone.addEventListener('click', function(e) {
-  dropzone_input.click();
-});
+}
 
 const readFile = (file) => {
   const reader = new FileReader();
