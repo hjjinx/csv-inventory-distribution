@@ -6,6 +6,9 @@ var loader = document.getElementById('loader');
 var countRows = document.getElementById('count-rows');
 var postProcessing = document.getElementById('post-processing');
 var downloadButton = document.getElementById('download-button');
+var discrepanciesCount = document.getElementById('discrepancies-count');
+var discrepanciesTable = document.getElementById('discrepancies-table');
+var discrepanciesTableBody = document.getElementById('discrepancies-table-body');
 
 ['drag', 'dragstart', 'dragend', 'dragover', 'dragenter', 'dragleave', 'drop'].forEach(function(event) {
   dropzone.addEventListener(event, function(e) {
@@ -78,4 +81,21 @@ const saveFile = (csvData) => {
   dropzoneText.innerHTML = `Upload another file`;
   dropzoneIcon.style.display = 'block';
   postProcessing.style.display = 'block';
+  displayDiscrepancies()
+}
+
+const displayDiscrepancies = () => {
+  discrepanciesCount.innerHTML = discrepancies.length;
+  discrepanciesTableBody.innerHTML = '';
+  discrepancies.forEach(d => {
+    const row = document.createElement('tr');
+    for (const cell of Object.keys(d)) {
+      const cellData = d[cell];
+      const td = document.createElement('td');
+      td.textContent = cellData;
+      row.appendChild(td);
+    }
+  
+    discrepanciesTableBody.appendChild(row);
+  })
 }

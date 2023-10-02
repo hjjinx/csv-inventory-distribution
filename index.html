@@ -24,6 +24,19 @@
     </div>
     <div class="post-processing" id="post-processing">
       Successfully processed <span id="count-rows" class="green">0</span> rows of data! Click <a class="green click" id="download-button">here</a> to download the generated CSV.
+      <div>There were <span id="discrepancies-count"></span> discrepancies found in Products. These products were not processed:</div>
+      <table class="table" id="discrepancies-table">
+        <thead>
+          <tr>
+            <th scope="col">Reason</th>
+            <th scope="col">Parent SKU</th>
+            <th scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody id="discrepancies-table-body">
+          
+        </tbody>
+      </table>
     </div>
   </body>
 </html>

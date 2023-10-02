@@ -14,7 +14,11 @@ const REVENUE_INDEX = 3;
 
 const MIN_AMOUNT = 2;
 
+let discrepancies = []
+
 const processCsv = (parsedData) => {
+  discrepancies = [];
+
   const [inventory, invalidRows] = getInventoryFromCsv(parsedData)
   const newInventory = JSON.parse(JSON.stringify(inventory));
   console.log(`Invalid Rows: ${invalidRows.length}\n`)
@@ -37,7 +41,8 @@ const processCsv = (parsedData) => {
       totalRevenue += newInventory[parentSku][variation].revenue
       if (newInventory[parentSku][variation]['color'] != color) {
         isColorDiscrepancyFound = true;
-        console.log(`Color discrepancy found! Parent SKU: ${parentSku}. Colors: ${color}, ${newInventory[parentSku][variation]['color']}`)
+        discrepancies.push({reason: 'Color', parentSku, description: `Colors: ${color}, ${newInventory[parentSku][variation]['color']}`});
+        console.log(`Color discrepancy found! Parent SKU: ${parentSku}. Colors: ${color}, ${newInventory[parentSku][variation]['color']}`);
       }
     }
     if (isColorDiscrepancyFound) continue;
