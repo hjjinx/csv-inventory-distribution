@@ -3,6 +3,9 @@ var dropzoneIcon = document.getElementById('dropzone-icon');
 var dropzoneInput = document.getElementById('dropzone-input');
 var dropzoneText = document.getElementById('dropzone-text');
 var loader = document.getElementById('loader');
+var countRows = document.getElementById('count-rows');
+var postProcessing = document.getElementById('post-processing');
+var downloadButton = document.getElementById('download-button');
 
 ['drag', 'dragstart', 'dragend', 'dragover', 'dragenter', 'dragleave', 'drop'].forEach(function(event) {
   dropzone.addEventListener(event, function(e) {
@@ -56,8 +59,23 @@ const readFile = (file) => {
       const columns = rows[j].split(',');
       csvArray.push(columns);
     }
-
-    console.log(csvArray);
+    countRows.innerHTML = csvArray.length - 1;
+    dropzoneText.innerHTML = `Processing ${csvArray.length - 1} rows of data...`
+    setTimeout(() => processCsv(csvArray), 1000)
   }
   reader.readAsText(file);
+}
+
+const saveFile = (csvData) => {
+  const blob = new Blob([csvData], { type: 'text/csv' });
+
+  const url = window.URL.createObjectURL(blob);
+
+  downloadButton.href = url;
+  downloadButton.download = 'generated.csv';
+
+  loader.style.display = 'none';
+  dropzoneText.innerHTML = `Upload another file`;
+  dropzoneIcon.style.display = 'block';
+  postProcessing.style.display = 'block';
 }

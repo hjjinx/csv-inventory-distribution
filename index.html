@@ -4,6 +4,7 @@
     <link rel="stylesheet" href="./index.css"/>
     <link rel="stylesheet" href="./loader.css"/>
     <script defer src="./index.js"> </script>
+    <script defer src="./processCsv.js"> </script>
   </head>
   <body>
     <h1>Inventory Distribution for Product Counts based on Revenue</h1>
@@ -20,6 +21,9 @@
         Drop files or Click here to select files to upload.
       </span>
       <input type="file" name="files" class="dropzone-input" id="dropzone-input" />
+    </div>
+    <div class="post-processing" id="post-processing">
+      Successfully processed <span id="count-rows" class="green">0</span> rows of data! Click <a class="green click" id="download-button">here</a> to download the generated CSV.
     </div>
   </body>
 </html>

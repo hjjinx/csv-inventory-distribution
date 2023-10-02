@@ -36,3 +36,14 @@ h1 {
 .dropzone-input {
   display: none;
 }
+
+.post-processing {
+  margin-top: 20px;
+  display: none;
+}
+.green {
+  color: rgba(29, 111, 66, 1);
+}
+.green.click {
+  cursor: pointer;
+}
