@@ -93,6 +93,7 @@ const displayDiscrepancies = () => {
       const cellData = d[cell];
       const td = document.createElement('td');
       td.textContent = cellData;
+      if (cell == 'reason') td.className = cellData;
       row.appendChild(td);
     }
   

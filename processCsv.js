@@ -1,12 +1,3 @@
-const ALLOWED_VARIATIONS = [
-  '1pcs_COV',
-  '2pcs_COV',
-  '4pcs_COV',
-  '1pcs_INS',
-  '2pcs_INS',
-  '4pcs_INS',
-]
-
 const COLOR_INDEX = 0;
 const SKU_INDEX = 1;
 const QUANTITY_INDEX = 2;
@@ -21,8 +12,7 @@ const processCsv = (parsedData) => {
 
   const [inventory, invalidRows] = getInventoryFromCsv(parsedData)
   const newInventory = JSON.parse(JSON.stringify(inventory));
-  console.log(`Invalid Rows: ${invalidRows.length}\n`)
-
+  console.log({newInventory})
   for (let parentSku of Object.keys(newInventory)) {
     // if (Object.keys(newInventory[parentSku]).length < 3) {
     //   console.log(`WARNING: Disregarding ${parentSku} because there are less than 3 variations for this.`)
@@ -42,10 +32,9 @@ const processCsv = (parsedData) => {
       if (newInventory[parentSku][variation]['color'] != color) {
         isColorDiscrepancyFound = true;
         discrepancies.push({reason: 'Color', parentSku, description: `Colors: ${color}, ${newInventory[parentSku][variation]['color']}`});
-        console.log(`Color discrepancy found! Parent SKU: ${parentSku}. Colors: ${color}, ${newInventory[parentSku][variation]['color']}`);
+        newInventory[parentSku].isIgnored = 'Color';
       }
     }
-    if (isColorDiscrepancyFound) continue;
 
     // first, assign MIN_AMOUNT to all products
     for (let variation of variations) {
@@ -81,9 +70,9 @@ const processCsv = (parsedData) => {
 
     // distribute remaning quantity into the smallest variant:
     if (totalProductUsed != totalProduct) {
-      // selecting smallest variant
       const remainingProduct = totalProduct - totalProductUsed;
       
+      // selecting smallest variant
       const variation = variations.sort((a, b) => parseInt(a) - parseInt(b))[0]
       let thisQuantity = Math.ceil(remainingProduct / getCountForThisVariation(variation));
       let productUsedForThisVariation = thisQuantity * getCountForThisVariation(variation);
@@ -91,10 +80,13 @@ const processCsv = (parsedData) => {
       newInventory[parentSku][variation].quantity += thisQuantity;
 
       if (totalProductUsed != totalProduct) {
-        console.log(`total product not used for ${parentSku}, quantity: ${remainingProduct}`)
+        newInventory[parentSku] = inventory[parentSku];
+        discrepancies.push({reason: 'Quantity', parentSku, description: `Quantity mismatch. Unable to divide quantities.`});
+        newInventory[parentSku].isIgnored = 'Quantity';
       }
     }
   }
+  console.log({discrepancies})
   console.log()
   const newCsv = getCsvFromInventory(newInventory);
   saveFile(newCsv);
@@ -113,23 +105,21 @@ const getInventoryFromCsv = (parsedData) => {
     const thisQuantity = row[QUANTITY_INDEX]
     const revenue = row[REVENUE_INDEX]
 
-    const skuParts = sku.split('-')
-    const skuParts2 = sku.split('_')
-    let thisVariation;
-    if (skuParts[3]) {
-      thisVariation = skuParts[3];
+    let skuParts = sku.split(/[-_]/)
+    let thisVariation = '';
+    const numOfUnderscores = sku.split('-').length - 1;
+    if (numOfUnderscores >= 3) {
+      const sku_0 = skuParts[0];
+      const sku_1 = skuParts[1];
+      const sku_2 = skuParts[2];
+      thisVariation = sku.slice(sku_0.length + sku_1.length + sku_2.length + 3);
     } else {
-      if (skuParts2.length >= 2) {
-        thisVariation = skuParts2.slice(1).join('_')
-      }
+      skuParts = sku.split('_');
+      thisVariation = skuParts.slice(1).join('_');
     }
-    if (thisVariation && ALLOWED_VARIATIONS.includes(thisVariation)) {
-      let parentSku;
-      if (skuParts[3]) {
-        parentSku = skuParts.slice(0,3).join('-');
-      } else {
-        parentSku = skuParts2.slice(0,1).join('_');
-      }
+    const parentSku = sku.slice(0, sku.length - thisVariation.length);
+    
+    if (thisVariation) {
       const object = {
         quantity: parseInt(thisQuantity),
         revenue: Number(revenue),
@@ -145,21 +135,26 @@ const getInventoryFromCsv = (parsedData) => {
     } else {
       // this sku is invalid
       invalidRows.push(parsedData[i])
+      discrepancies.push({reason: 'Variation', sku, description: `Variation not recognized: ${thisVariation}`});
     }
   }
   return [inventory, invalidRows];
 }
 
 const getCsvFromInventory = (inventory) => {
-  let csv = 'Color,Supplier Part Number,Current Available Quantity,Revenue\n';
+  let csv = 'Color,Supplier Part Number,Current Available Quantity,Revenue,Not Processed Reason\n';
 
   for (const parentSku in inventory) {
     const variants = inventory[parentSku];
-
+    let isIgnored;
+    if ('isIgnored' in variants) {
+      isIgnored = variants.isIgnored;
+      delete variants.isIgnored
+    }
     for (const variant in variants) {
       const { quantity, revenue, color } = variants[variant];
-      const sku = `${parentSku}_${variant}`;
-      csv += `${color},${sku},${quantity},${revenue}\n`;
+      const sku = `${parentSku}${variant}`;
+      csv += `${color},${sku},${quantity},${revenue},${isIgnored ? `+${isIgnored}+` : ''}\n`;
     }
   }
 
