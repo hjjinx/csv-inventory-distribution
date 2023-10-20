@@ -3,7 +3,6 @@ const SKU_INDEX = 1;
 const QUANTITY_INDEX = 2;
 const REVENUE_INDEX = 3;
 
-const MIN_AMOUNT = 2;
 
 let discrepancies = []
 
@@ -12,7 +11,6 @@ const processCsv = (parsedData) => {
 
   const [inventory, invalidRows] = getInventoryFromCsv(parsedData)
   const newInventory = JSON.parse(JSON.stringify(inventory));
-  console.log({newInventory})
   for (let parentSku of Object.keys(newInventory)) {
     // if (Object.keys(newInventory[parentSku]).length < 3) {
     //   console.log(`WARNING: Disregarding ${parentSku} because there are less than 3 variations for this.`)
@@ -23,34 +21,49 @@ const processCsv = (parsedData) => {
     // console.log(variations)
     let totalProduct = 0;
     let totalProductUsed = 0;
+    let minProductRequiredToHaveOneQuantityForAllVariations = 0;
     let totalRevenue = 0;
     let color = newInventory[parentSku][variations[0]]['color']
     let isColorDiscrepancyFound = false;
+    let minQuantity = 1;
     for (let variation of variations) {
       totalProduct += newInventory[parentSku][variation].quantity * getCountForThisVariation(variation)
       totalRevenue += newInventory[parentSku][variation].revenue
+      newInventory[parentSku][variation].quantity = 0;
+      minProductRequiredToHaveOneQuantityForAllVariations += getCountForThisVariation(variation)
       if (newInventory[parentSku][variation]['color'] != color) {
         isColorDiscrepancyFound = true;
         discrepancies.push({reason: 'Color', parentSku, description: `Colors: ${color}, ${newInventory[parentSku][variation]['color']}`});
         newInventory[parentSku].isIgnored = 'Color';
       }
     }
+    
+    if (totalProduct > minProductRequiredToHaveOneQuantityForAllVariations * 10) minQuantity = 5;
+    if (totalProduct > minProductRequiredToHaveOneQuantityForAllVariations * 8) minQuantity = 4;
+    else if (totalProduct > minProductRequiredToHaveOneQuantityForAllVariations * 6) minQuantity = 3;
+    else if (totalProduct > minProductRequiredToHaveOneQuantityForAllVariations * 4) minQuantity = 2;
+    else if (totalProduct >= minProductRequiredToHaveOneQuantityForAllVariations) minQuantity = 1;
+    else minQuantity = 0;
 
-    // first, assign MIN_AMOUNT to all products
-    for (let variation of variations) {
-      const productUsedForThisVariation = getCountForThisVariation(variation) * MIN_AMOUNT;
-      if (productUsedForThisVariation + totalProductUsed <= totalProduct) {
-        totalProductUsed += productUsedForThisVariation;
-        newInventory[parentSku][variation].quantity = MIN_AMOUNT;
+    if (minQuantity > 0) {
+      // first, assign MIN_AMOUNT to all products
+      for (let variation of variations) {
+        
+        const productUsedForThisVariation = getCountForThisVariation(variation) * minQuantity;
+        if (productUsedForThisVariation + totalProductUsed <= totalProduct) {
+          totalProductUsed += productUsedForThisVariation;
+          newInventory[parentSku][variation].quantity = minQuantity;
+        }
       }
     }
-
+    let productRemainingAfterMinAssignment = totalProduct - totalProductUsed;
+    
     // sort variations according to revenue
     variations = variations.sort((a, b) => newInventory[parentSku][b].revenue - newInventory[parentSku][a].revenue)
     // Now, distribute the rest according to revenue
     for (let variation of variations) {
       const revenueRatio = newInventory[parentSku][variation].revenue / totalRevenue;
-      let thisQuantity = Math.ceil((totalProduct * revenueRatio) / getCountForThisVariation(variation));
+      let thisQuantity = Math.ceil(((totalProduct - productRemainingAfterMinAssignment) * revenueRatio) / getCountForThisVariation(variation));
       if (String(thisQuantity) == 'NaN') thisQuantity = 0
 
       let productUsedForThisVariation = thisQuantity * getCountForThisVariation(variation);
@@ -78,16 +91,21 @@ const processCsv = (parsedData) => {
       let productUsedForThisVariation = thisQuantity * getCountForThisVariation(variation);
       totalProductUsed += productUsedForThisVariation;
       newInventory[parentSku][variation].quantity += thisQuantity;
-
-      if (totalProductUsed != totalProduct) {
-        newInventory[parentSku] = inventory[parentSku];
-        discrepancies.push({reason: 'Quantity', parentSku, description: `Quantity mismatch. Unable to divide quantities.`});
-        newInventory[parentSku].isIgnored = 'Quantity';
-      }
+    }
+    
+    // verifying that all but no extra product was used:
+    let finalTotalUsedProduct = 0
+    for (let variation of variations) {
+      finalTotalUsedProduct += newInventory[parentSku][variation].quantity * getCountForThisVariation(variation)
+    }
+    if (finalTotalUsedProduct != totalProduct) {
+      newInventory[parentSku] = inventory[parentSku];
+      discrepancies.push({reason: 'Quantity', parentSku, description: `Quantity mismatch. Unable to divide quantities.`});
+      newInventory[parentSku].isIgnored = 'Quantity';
     }
   }
   console.log({discrepancies})
-  console.log()
+  console.log({newInventory})
   const newCsv = getCsvFromInventory(newInventory);
   saveFile(newCsv);
 }
