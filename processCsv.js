@@ -3,7 +3,6 @@ const SKU_INDEX = 1;
 const QUANTITY_INDEX = 2;
 const REVENUE_INDEX = 3;
 
-
 let discrepancies = []
 
 const processCsv = (parsedData) => {
@@ -39,7 +38,7 @@ const processCsv = (parsedData) => {
     }
     
     if (totalProduct > minProductRequiredToHaveOneQuantityForAllVariations * 10) minQuantity = 5;
-    if (totalProduct > minProductRequiredToHaveOneQuantityForAllVariations * 8) minQuantity = 4;
+    else if (totalProduct > minProductRequiredToHaveOneQuantityForAllVariations * 8) minQuantity = 4;
     else if (totalProduct > minProductRequiredToHaveOneQuantityForAllVariations * 6) minQuantity = 3;
     else if (totalProduct > minProductRequiredToHaveOneQuantityForAllVariations * 4) minQuantity = 2;
     else if (totalProduct >= minProductRequiredToHaveOneQuantityForAllVariations) minQuantity = 1;
@@ -136,19 +135,26 @@ const getInventoryFromCsv = (parsedData) => {
       thisVariation = skuParts.slice(1).join('_');
     }
     const parentSku = sku.slice(0, sku.length - thisVariation.length);
+    let parentSkuKey = parentSku;
+    
+    // handling the ends with "A" case:
+    if (parentSku.endsWith('A_') || parentSku.endsWith('A-')) {
+      parentSkuKey = parentSku.slice(0, - 2) + parentSku.slice(- 1)
+    }
     
     if (thisVariation) {
       const object = {
         quantity: parseInt(thisQuantity),
         revenue: Number(revenue),
-        color
+        color,
+        parent: parentSku
       }
-      if (!inventory[parentSku]) {
-        inventory[parentSku] = {
+      if (!inventory[parentSkuKey]) {
+        inventory[parentSkuKey] = {
           [thisVariation]: object
         }
       } else {
-        inventory[parentSku][thisVariation] = object;
+        inventory[parentSkuKey][thisVariation] = object;
       }
     } else {
       // this sku is invalid
@@ -170,8 +176,8 @@ const getCsvFromInventory = (inventory) => {
       delete variants.isIgnored
     }
     for (const variant in variants) {
-      const { quantity, revenue, color } = variants[variant];
-      const sku = `${parentSku}${variant}`;
+      const { quantity, revenue, color, parent} = variants[variant];
+      const sku = `${parent}${variant}`;
       csv += `${color},${sku},${quantity},${revenue},${isIgnored ? `+${isIgnored}+` : ''}\n`;
     }
   }
