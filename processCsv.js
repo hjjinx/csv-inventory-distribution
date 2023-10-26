@@ -27,7 +27,7 @@ const processCsv = (parsedData) => {
     let minQuantity = 1;
     for (let variation of variations) {
       totalProduct += newInventory[parentSku][variation].quantity * getCountForThisVariation(variation)
-      totalRevenue += newInventory[parentSku][variation].revenue
+      totalRevenue += Math.max(0, newInventory[parentSku][variation].revenue)
       newInventory[parentSku][variation].quantity = 0;
       minProductRequiredToHaveOneQuantityForAllVariations += getCountForThisVariation(variation)
       if (newInventory[parentSku][variation]['color'] != color) {
@@ -61,7 +61,7 @@ const processCsv = (parsedData) => {
     variations = variations.sort((a, b) => newInventory[parentSku][b].revenue - newInventory[parentSku][a].revenue)
     // Now, distribute the rest according to revenue
     for (let variation of variations) {
-      const revenueRatio = newInventory[parentSku][variation].revenue / totalRevenue;
+      const revenueRatio = Math.max(0, newInventory[parentSku][variation].revenue) / totalRevenue;
       let thisQuantity = Math.ceil(((totalProduct - productRemainingAfterMinAssignment) * revenueRatio) / getCountForThisVariation(variation));
       if (String(thisQuantity) == 'NaN') thisQuantity = 0
 
