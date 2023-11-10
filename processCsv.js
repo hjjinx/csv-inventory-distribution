@@ -85,7 +85,7 @@ const processCsv = (parsedData) => {
       const remainingProduct = totalProduct - totalProductUsed;
       
       // selecting smallest variant
-      const variation = variations.sort((a, b) => parseInt(a) - parseInt(b))[0]
+      const variation = variations.sort((a, b) => a.replace(/[^0-9]/g, '') - b.replace(/[^0-9]/g, ''))[0]
       let thisQuantity = Math.ceil(remainingProduct / getCountForThisVariation(variation));
       let productUsedForThisVariation = thisQuantity * getCountForThisVariation(variation);
       totalProductUsed += productUsedForThisVariation;
