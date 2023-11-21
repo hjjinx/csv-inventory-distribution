@@ -62,16 +62,17 @@ const processCsv = (parsedData) => {
     // Now, distribute the rest according to revenue
     for (let variation of variations) {
       const revenueRatio = Math.max(1, newInventory[parentSku][variation].revenue) / totalRevenue;
-      let thisQuantity = Math.ceil(((totalProduct - productRemainingAfterMinAssignment) * revenueRatio) / getCountForThisVariation(variation));
+      let thisQuantity = Math.ceil(((productRemainingAfterMinAssignment) * revenueRatio) / getCountForThisVariation(variation));
       if (String(thisQuantity) == 'NaN') thisQuantity = 0
 
       let productUsedForThisVariation = thisQuantity * getCountForThisVariation(variation);
       while (totalProduct - (totalProductUsed + productUsedForThisVariation) < 0) {
-        if (totalProductUsed == 0) {
-          thisQuantity = 0;
-          productUsedForThisVariation = 0;
-          break;
-        }
+        // this commented code below is very wrong, not sure why I wrote this.
+        // if (totalProductUsed == 0) {
+        //   thisQuantity = 0;
+        //   productUsedForThisVariation = 0;
+        //   break;
+        // }
         thisQuantity--;
         productUsedForThisVariation = thisQuantity * getCountForThisVariation(variation);
       }
