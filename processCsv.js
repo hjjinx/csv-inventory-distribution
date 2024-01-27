@@ -160,6 +160,15 @@ const getInventoryFromCsv = (parsedData) => {
     } else {
       // this sku is invalid
       invalidRows.push(parsedData[i])
+      const object = {
+        quantity: parseInt(thisQuantity),
+        revenue: Number(revenue),
+        color,
+        parent: parentSku
+      }
+      inventory[parentSkuKey] = {
+        ['']: object
+      }
       discrepancies.push({reason: 'Variation', sku, description: `Variation not recognized: ${thisVariation}`});
     }
   }
