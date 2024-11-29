@@ -170,8 +170,12 @@ const getInventoryFromCsv = (parsedData) => {
         color,
         parent: parentSku
       }
-      inventory[parentSkuKey] = {
-        ['']: object
+      if (!inventory[parentSkuKey]) {
+        inventory[parentSkuKey] = {
+          ['']: object
+        }
+      } else {
+        inventory[parentSkuKey][''] = object;
       }
       discrepancies.push({reason: 'Variation', sku, description: `Variation not recognized: ${thisVariation}`});
     }
