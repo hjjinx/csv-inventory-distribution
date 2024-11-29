@@ -138,10 +138,14 @@ const getInventoryFromCsv = (parsedData) => {
     const parentSku = sku.slice(0, sku.length - thisVariation.length);
     let parentSkuKey = parentSku;
     
-    // handling the ends with "A" case:
-    if (parentSku.endsWith('A_') || parentSku.endsWith('A-')) {
-      parentSkuKey = parentSku.slice(0, - 2) + parentSku.slice(- 1)
-    }
+    /**
+     * Commenting this out.
+      // handling the ends with "A" case:
+      if (parentSku.endsWith('A_') || parentSku.endsWith('A-')) {
+        parentSkuKey = parentSku.slice(0, - 2) + parentSku.slice(- 1)
+      }
+     *
+     */
     
     if (thisVariation) {
       const object = {
