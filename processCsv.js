@@ -118,6 +118,10 @@ const getInventoryFromCsv = (parsedData) => {
       continue
     }
     const row = parsedData[i];
+    if (row.length < 4) {
+      invalidRows.push(row);
+      continue;
+    }
     const color = row[COLOR_INDEX]
     const sku = row[SKU_INDEX]
     const thisQuantity = row[QUANTITY_INDEX]
@@ -136,17 +140,17 @@ const getInventoryFromCsv = (parsedData) => {
       thisVariation = skuParts.slice(1).join('_');
     }
     const parentSku = sku.slice(0, sku.length - thisVariation.length);
-    let parentSkuKey = parentSku;
-    
-    /**
-     * Commenting this out.
-      // handling the ends with "A" case:
-      if (parentSku.endsWith('A_') || parentSku.endsWith('A-')) {
-        parentSkuKey = parentSku.slice(0, - 2) + parentSku.slice(- 1)
-      }
-     *
-     */
-    
+
+    // Grouping key: strip trailing separator, then strip variant-level 'A' suffix.
+    // This ensures mixed-delimiter variants (e.g. 'WR60036-2-1_' and 'WR60036-2-1-')
+    // and A-suffix variants (e.g. 'WR60001-2-2A_') all land in the same group.
+    let parentSkuKey;
+    if (parentSku.endsWith('A_') || parentSku.endsWith('A-')) {
+      parentSkuKey = parentSku.slice(0, -2); // drop 'A_' or 'A-', leaves no trailing sep
+    } else {
+      parentSkuKey = parentSku.replace(/[-_]$/, ''); // strip trailing - or _
+    }
+
     if (thisVariation) {
       const object = {
         quantity: parseInt(thisQuantity),
@@ -158,6 +162,10 @@ const getInventoryFromCsv = (parsedData) => {
         inventory[parentSkuKey] = {
           [thisVariation]: object
         }
+      } else if (inventory[parentSkuKey][thisVariation]) {
+        // same variation already exists (e.g. non-A and A SKU both have it): merge
+        inventory[parentSkuKey][thisVariation].quantity += parseInt(thisQuantity);
+        inventory[parentSkuKey][thisVariation].revenue += Number(revenue);
       } else {
         inventory[parentSkuKey][thisVariation] = object;
       }
@@ -204,11 +212,9 @@ const getCsvFromInventory = (inventory) => {
 }
 
 const getCountForThisVariation = (variation) => {
-  if (variation.includes('4')) {
-    return 4
-  } else if (variation.includes('2')) {
-    return 2
-  } else {
-    return 1
-  }
+  const match = variation.match(/(\d+)pcs/);
+  if (match) return parseInt(match[1]);
+  if (variation.includes('4')) return 4;
+  if (variation.includes('2')) return 2;
+  return 1;
 }
