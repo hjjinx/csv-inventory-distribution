@@ -163,9 +163,12 @@ const getInventoryFromCsv = (parsedData) => {
           [thisVariation]: object
         }
       } else if (inventory[parentSkuKey][thisVariation]) {
-        // same variation already exists (e.g. non-A and A SKU both have it): merge
+        // same variation already exists (e.g. non-A and A SKU both have it): merge for redistribution
         inventory[parentSkuKey][thisVariation].quantity += parseInt(thisQuantity);
         inventory[parentSkuKey][thisVariation].revenue += Number(revenue);
+        // keep original row in output as zero so Wayfair receives an explicit update for it
+        if (!inventory[parentSkuKey]._zeroRows) inventory[parentSkuKey]._zeroRows = [];
+        inventory[parentSkuKey]._zeroRows.push({ color, sku, revenue: Number(revenue) });
       } else {
         inventory[parentSkuKey][thisVariation] = object;
       }
@@ -199,12 +202,20 @@ const getCsvFromInventory = (inventory) => {
     let isIgnored;
     if ('isIgnored' in variants) {
       isIgnored = variants.isIgnored;
-      delete variants.isIgnored
+      delete variants.isIgnored;
+    }
+    let zeroRows = [];
+    if ('_zeroRows' in variants) {
+      zeroRows = variants._zeroRows;
+      delete variants._zeroRows;
     }
     for (const variant in variants) {
       const { quantity, revenue, color, parent} = variants[variant];
       const sku = `${parent}${variant}`;
       csv += `${color},${sku},${quantity},${revenue},${isIgnored ? `+${isIgnored}+` : ''}\n`;
+    }
+    for (const zRow of zeroRows) {
+      csv += `${zRow.color},${zRow.sku},0,${zRow.revenue},\n`;
     }
   }
 
