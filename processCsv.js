@@ -40,6 +40,8 @@ const processCsv = (parsedData) => {
     if (isColorDiscrepancyFound) {
       newInventory[parentSku] = inventory[parentSku];
       newInventory[parentSku].isIgnored = 'Color';
+      newInventory[parentSku]._preTotal = totalProduct;
+      newInventory[parentSku]._postTotal = totalProduct;
       continue;
     }
 
@@ -108,110 +110,97 @@ const processCsv = (parsedData) => {
       newInventory[parentSku] = inventory[parentSku];
       discrepancies.push({reason: 'Quantity', parentSku, description: `Quantity mismatch. Unable to divide quantities.`});
       newInventory[parentSku].isIgnored = 'Quantity';
+      newInventory[parentSku]._preTotal = totalProduct;
+      newInventory[parentSku]._postTotal = totalProduct;
+    } else {
+      newInventory[parentSku]._preTotal = totalProduct;
+      newInventory[parentSku]._postTotal = finalTotalUsedProduct;
     }
   }
-  const newCsv = getCsvFromInventory(newInventory);
+  const newCsv = getCsvFromInventory(newInventory, invalidRows);
   saveFile(newCsv);
 }
-
-// Returns the longest string that is a prefix of both a and b.
-const longestCommonPrefix = (a, b) => {
-  let i = 0;
-  while (i < a.length && i < b.length && a[i] === b[i]) i++;
-  return a.slice(0, i);
-};
 
 const getInventoryFromCsv = (parsedData) => {
   const inventory = {};
   const invalidRows = [];
 
-  // Collect valid data rows (skip header).
-  const rows = [];
   for (let i = 1; i < parsedData.length; i++) {
     if (!parsedData[i] || !parsedData[i][0]) continue;
-    if (parsedData[i].length < 4) { invalidRows.push(parsedData[i]); continue; }
-    rows.push(parsedData[i]);
-  }
+    const row = parsedData[i];
+    if (row.length < 4) { invalidRows.push(row); continue; }
 
-  // Group consecutive rows into blocks. Each block shares the same product; the
-  // block's parent is the longest common prefix (LCP) of all SKUs in the block.
-  //
-  // Block boundary rule: when the next SKU diverges from the running LCP at a bare
-  // digit (not the start of a pack-size token like "2pcs"), we've hit a product-code
-  // number boundary and must start a new block. Separators (-, _) and letters (A, COV…)
-  // at the divergence point mean we're still in the same product family.
-  let i = 0;
-  while (i < rows.length) {
-    let blockLcp = rows[i][SKU_INDEX];
-    let j = i + 1;
+    const color = row[COLOR_INDEX];
+    const sku = row[SKU_INDEX];
+    const thisQuantity = row[QUANTITY_INDEX];
+    const revenue = row[REVENUE_INDEX];
 
-    while (j < rows.length) {
-      const nextSku = rows[j][SKU_INDEX];
-      const newLcp = longestCommonPrefix(blockLcp, nextSku);
-      const suffixInNext  = nextSku.slice(newLcp.length);
-      const suffixInBlock = blockLcp.slice(newLcp.length);
-
-      // New block if either side diverges at a bare digit that isn't a pack-size token.
-      const bareDigitInNext  = /\d/.test(suffixInNext[0])  && !/^\d+pcs/.test(suffixInNext);
-      const bareDigitInBlock = /\d/.test(suffixInBlock[0]) && !/^\d+pcs/.test(suffixInBlock);
-      if (bareDigitInNext || bareDigitInBlock) {
-        break; // nextSku is start of new block
-      }
-
-      blockLcp = newLcp;
-      j++;
+    // Determine the parent SKU key. SKUs with 3+ dashes use the first three
+    // dash-separated segments (handles COV-embedded format like WR70019-3-17-COV-2pcs).
+    // Otherwise the parent is everything before the first underscore. In both cases a
+    // trailing 'A' is stripped so A-listings group with their non-A counterpart.
+    const numOfDashes = sku.split('-').length - 1;
+    let parsedParentSku;
+    if (numOfDashes >= 3) {
+      const [s0, s1, s2] = sku.split(/[-_]/);
+      parsedParentSku = sku.slice(0, s0.length + s1.length + s2.length + 3);
+    } else {
+      parsedParentSku = sku.split('_')[0];
     }
+    let parentSkuKey = parsedParentSku.replace(/[-_]$/, '');
+    if (parentSkuKey.endsWith('A')) parentSkuKey = parentSkuKey.slice(0, -1);
 
-    // Process all rows in this block. The variation is everything after the block LCP,
-    // so A-variants (e.g. "A_2pcs_INS") and normal variants ("_2pcs_INS") get distinct
-    // variation keys and each receive their own inventory allocation.
-    for (let k = i; k < j; k++) {
-      const row = rows[k];
-      const color = row[COLOR_INDEX];
-      const sku = row[SKU_INDEX];
-      const thisQuantity = row[QUANTITY_INDEX];
-      const revenue = row[REVENUE_INDEX];
-      const thisVariation = sku.slice(blockLcp.length);
+    // Variation = everything after the parent key. This includes the leading separator
+    // or 'A', giving A-variants a distinct key (e.g. "A_1pcs_INS") from non-A ("_1pcs_INS").
+    const thisVariation = sku.slice(parentSkuKey.length);
 
-      if (thisVariation) {
-        const object = { quantity: parseInt(thisQuantity), revenue: Number(revenue), color, parent: blockLcp };
-        if (!inventory[blockLcp]) {
-          inventory[blockLcp] = { [thisVariation]: object };
-        } else if (inventory[blockLcp][thisVariation]) {
-          // Exact duplicate SKU within the same block: merge quantities.
-          inventory[blockLcp][thisVariation].quantity += parseInt(thisQuantity);
-          inventory[blockLcp][thisVariation].revenue += Number(revenue);
-        } else {
-          inventory[blockLcp][thisVariation] = object;
-        }
+    if (thisVariation) {
+      const object = { quantity: parseInt(thisQuantity), revenue: Number(revenue), color, parent: parentSkuKey };
+      if (!inventory[parentSkuKey]) {
+        inventory[parentSkuKey] = { [thisVariation]: object };
+      } else if (inventory[parentSkuKey][thisVariation]) {
+        // Exact duplicate variation key: merge quantities and revenue.
+        inventory[parentSkuKey][thisVariation].quantity += parseInt(thisQuantity);
+        inventory[parentSkuKey][thisVariation].revenue += Number(revenue);
       } else {
-        // Single-row block with no siblings: cannot infer a variation.
-        invalidRows.push(row);
-        discrepancies.push({ reason: 'Variation', sku, description: 'No variation could be inferred for standalone SKU' });
+        inventory[parentSkuKey][thisVariation] = object;
       }
+    } else {
+      // No variation could be parsed (e.g. bare product code with no suffix).
+      invalidRows.push(row);
+      discrepancies.push({ reason: 'Variation', sku, description: 'No variation could be inferred for this SKU' });
     }
-
-    i = j;
   }
 
   return [inventory, invalidRows];
 }
 
-const getCsvFromInventory = (inventory) => {
-  let csv = 'Color,Supplier Part Number,Current Available Quantity,Revenue,Not Processed Reason\n';
+const getCsvFromInventory = (inventory, invalidRows = []) => {
+  let csv = 'Color,Supplier Part Number,Current Available Quantity,Revenue,Not Processed Reason,Pre-dist Total (units),Post-dist Total (units)\n';
 
   for (const parentSku in inventory) {
     const variants = inventory[parentSku];
-    let isIgnored;
-    if ('isIgnored' in variants) {
-      isIgnored = variants.isIgnored;
-      delete variants.isIgnored;
-    }
+    let isIgnored, preTotal, postTotal;
+    if ('isIgnored' in variants) { isIgnored = variants.isIgnored; delete variants.isIgnored; }
+    if ('_preTotal' in variants) { preTotal = variants._preTotal; delete variants._preTotal; }
+    if ('_postTotal' in variants) { postTotal = variants._postTotal; delete variants._postTotal; }
+
     for (const variant in variants) {
       const { quantity, revenue, color, parent } = variants[variant];
       const sku = `${parent}${variant}`;
-      csv += `${color},${sku},${quantity},${revenue},${isIgnored ? `+${isIgnored}+` : ''}\n`;
+      csv += `${color},${sku},${quantity},${revenue},${isIgnored ? `+${isIgnored}+` : ''},,\n`;
     }
+
+    if (preTotal !== undefined) {
+      csv += `,${parentSku},,,SUMMARY,${preTotal},${postTotal}\n`;
+    }
+  }
+
+  // Rows that could not be parsed (too few columns or no variation found) are
+  // appended as-is so every input row appears in the output.
+  for (const row of invalidRows) {
+    const [color, sku, qty, revenue] = row;
+    csv += `${color || ''},${sku || ''},${qty || ''},${revenue || ''},NOT PROCESSED,,\n`;
   }
 
   return csv;
@@ -229,7 +218,6 @@ const getCountForThisVariation = (variation) => {
 if (typeof module !== 'undefined') {
   module.exports = {
     getInventoryFromCsv,
-    longestCommonPrefix,
     resetDiscrepancies: () => { discrepancies = []; },
     getDiscrepancies: () => discrepancies,
   };
